@@ -1,18 +1,39 @@
 import { FaSpinner } from 'react-icons/fa';
+import { clsx } from 'clsx';
 import { useAutocomplete } from './useAutocomplete.ts';
 import { GithubSearchResult, searchGitHub } from './githubSearchService.ts';
+import { useCallback } from 'react';
 
 export function GhAutocomplete() {
-  const { getInputProps, getListItemProps, isLoading, searchResults, error } =
-    useAutocomplete<GithubSearchResult>({
-      getData: searchGitHub,
-    });
+  const openGithubPage = useCallback(
+    (githubSearchResult: GithubSearchResult) => {
+      window.open(githubSearchResult.url, '_blank');
+    },
+    [],
+  );
+  const {
+    getInputProps,
+    getListItemProps,
+    getListProps,
+    searchResults,
+    isLoading,
+    isSuccess,
+    isError,
+    error,
+  } = useAutocomplete<GithubSearchResult>({
+    getData: searchGitHub,
+    onSelect: openGithubPage,
+  });
 
   return (
     <div className="relative w-full sm:w-2/3 md:w-1/2 lg:w-1/3 xl:w-1/4">
       <input
-        className="w-full rounded border border-gray-300 p-2 transition duration-150 ease-in-out focus:border-blue-500 focus:outline-none"
+        className={clsx(
+          'w-full rounded border border-gray-300 p-2 text-base transition duration-150 ease-in-out focus:border-blue-500 focus:outline-none',
+          isError && ['border-red-500', 'focus:border-red-500'],
+        )}
         type="text"
+        placeholder="User or repository name"
         {...getInputProps()}
       />
       {isLoading && (
@@ -23,14 +44,26 @@ export function GhAutocomplete() {
           <FaSpinner className="animate-spin" />
         </span>
       )}
-      {searchResults.length > 0 && (
-        <ul className="absolute max-h-[37.5rem] w-full overflow-y-scroll rounded-b border border-gray-200">
-          {searchResults.map((result) => (
-            <li {...getListItemProps(result)} />
+      {isSuccess && searchResults.length > 0 && (
+        <ul
+          className="absolute max-h-[22rem] w-full overflow-y-auto rounded border border-gray-200"
+          {...getListProps()}
+        >
+          {searchResults.map((result, index) => (
+            <li
+              {...getListItemProps(result, index, {
+                className: 'border-b border-gray-100 bg-white p-2',
+              })}
+            />
           ))}
         </ul>
       )}
-      {error && <p className="mt-1 text-sm text-red-500">{error}</p>}
+      {isSuccess && searchResults.length === 0 && (
+        <p className="absolute w-full rounded border border-gray-200 bg-white p-2 text-base">
+          No results found
+        </p>
+      )}
+      {isError && <p className="mx-1 my-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }

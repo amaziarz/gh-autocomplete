@@ -8,6 +8,7 @@ import { searchRepositories, searchUsers } from '@/api/github.ts';
 
 export interface GithubSearchResult extends SearchResult {
   type: 'user' | 'repository';
+  url: string;
 }
 
 function mapUsersResponseToSearchResults(
@@ -17,6 +18,7 @@ function mapUsersResponseToSearchResults(
     id: user.id.toString(),
     type: 'user',
     name: user.login,
+    url: user.html_url,
   }));
 }
 
@@ -27,6 +29,7 @@ function mapRepositoriesResponseToSearchResults(
     id: repository.id.toString(),
     type: 'repository',
     name: repository.name,
+    url: repository.html_url,
   }));
 }
 
