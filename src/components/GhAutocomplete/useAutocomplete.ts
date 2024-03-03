@@ -1,25 +1,133 @@
-import { useEffect, useRef, useState } from 'react';
+import { type Reducer, useEffect, useReducer, useRef } from 'react';
 import { clsx } from 'clsx';
+
+type NavigationKeyCode = 'ArrowDown' | 'ArrowUp' | 'Enter';
+
+const ALLOWED_KEY_CODES: NavigationKeyCode[] = [
+  'ArrowDown',
+  'ArrowUp',
+  'Enter',
+];
+
+function isNavigationCode(code: string): code is NavigationKeyCode {
+  return ALLOWED_KEY_CODES.includes(code as NavigationKeyCode);
+}
 
 export interface SearchResult {
   id: string;
   name: string;
 }
 
-export interface UseAutocompleteParams<T> {
-  getData: (value: string) => Promise<T[]>;
-  onSelect?: (item: T) => void;
-  searchDelay?: number;
-}
-
 type Status = 'initial' | 'loading' | 'success' | 'error';
 
-const MIN_SEARCH_LENGTH = 3;
-const KEY_CODES = {
-  ARROW_DOWN: 'ArrowDown',
-  ARROW_UP: 'ArrowUp',
-  ENTER: 'Enter',
-} satisfies Record<string, string>;
+type SelectedItemIndex = number | null;
+
+interface AutocompleteState<SearchResultType extends SearchResult> {
+  value: string;
+  status: Status;
+  error: string | null;
+  searchResults: SearchResultType[];
+  selectedItemIndex: SelectedItemIndex;
+}
+
+type AutocompleteAction<SearchResultType extends SearchResult> =
+  | {
+      type: 'INPUT_VALUE_CHANGED';
+      payload: string;
+    }
+  | {
+      type: 'SEARCH_LOADING';
+    }
+  | {
+      type: 'SEARCH_SUCCESS';
+      payload: SearchResultType[];
+    }
+  | {
+      type: 'SEARCH_ERROR';
+      payload: string;
+    }
+  | {
+      type: 'SELECTED_ITEM_CHANGED';
+      payload: NavigationKeyCode;
+    };
+
+function calculateSelectedItemIndexState(
+  keyCode: NavigationKeyCode,
+  prevIndex: SelectedItemIndex,
+  searchResultsLength: number,
+): SelectedItemIndex {
+  if (keyCode === 'ArrowDown') {
+    return prevIndex === null || prevIndex === searchResultsLength - 1
+      ? 0
+      : prevIndex + 1;
+  }
+  if (keyCode === 'ArrowUp') {
+    return prevIndex === null || prevIndex === 0
+      ? searchResultsLength - 1
+      : prevIndex - 1;
+  }
+  return null;
+}
+
+function autocompleteReducer<SearchResultType extends SearchResult>(
+  state: AutocompleteState<SearchResultType>,
+  action: AutocompleteAction<SearchResultType>,
+): AutocompleteState<SearchResultType> {
+  switch (action.type) {
+    case 'INPUT_VALUE_CHANGED':
+      return {
+        ...state,
+        value: action.payload,
+        ...(action.payload.length === 0 && {
+          status: 'initial',
+          searchResults: [],
+          selectedItemIndex: null,
+        }),
+      };
+    case 'SEARCH_LOADING':
+      return {
+        ...state,
+        status: 'loading',
+        error: null,
+        selectedItemIndex: null,
+      };
+    case 'SEARCH_SUCCESS':
+      return {
+        ...state,
+        status: 'success',
+        searchResults: [...action.payload].sort((a, b) =>
+          a.name.localeCompare(b.name),
+        ),
+      };
+    case 'SEARCH_ERROR':
+      return {
+        ...state,
+        status: 'error',
+        error: action.payload,
+        searchResults: [],
+        selectedItemIndex: null,
+      };
+    case 'SELECTED_ITEM_CHANGED': {
+      return {
+        ...state,
+        selectedItemIndex: calculateSelectedItemIndexState(
+          action.payload,
+          state.selectedItemIndex,
+          state.searchResults.length,
+        ),
+      };
+    }
+    default:
+      return state;
+  }
+}
+
+export interface UseAutocompleteParams<SearchResultType extends SearchResult> {
+  getData: (value: string) => Promise<SearchResultType[]>;
+  onSelect?: (item: SearchResultType) => void;
+  searchDelay?: number;
+  minSearchLength?: number;
+}
 
 export function useAutocomplete<
   SearchResultType extends SearchResult,
@@ -28,46 +136,42 @@ export function useAutocomplete<
   getData,
   onSelect,
   searchDelay = 300,
+  minSearchLength = 3,
 }: UseAutocompleteParams<SearchResultType>) {
   const timeoutIdRef = useRef<number | null>(null);
   const listRef = useRef<ListElementType | null>(null);
-  const [value, setValue] = useState('');
-  const [status, setStatus] = useState<Status>('initial');
-  const [error, setError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<SearchResultType[]>([]);
-  const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(
-    null,
-  );
+  const [state, dispatch] = useReducer<
+    Reducer<
+      AutocompleteState<SearchResultType>,
+      AutocompleteAction<SearchResultType>
+    >
+  >(autocompleteReducer, {
+    value: '',
+    status: 'initial',
+    error: null,
+    searchResults: [],
+    selectedItemIndex: null,
+  });
 
   useEffect(() => {
     if (timeoutIdRef.current) {
       clearTimeout(timeoutIdRef.current);
     }
 
-    if (value.length === 0) {
-      setStatus('initial');
-      setSearchResults([]);
-      setSelectedItemIndex(null);
-    }
-    if (value.length < MIN_SEARCH_LENGTH) {
+    if (state.value.length < minSearchLength) {
       return;
     }
 
     timeoutIdRef.current = setTimeout(async () => {
       try {
-        setStatus('loading');
-        setError(null);
-        setSelectedItemIndex(null);
-        const results = await getData(value);
-        setSearchResults(
-          [...results].sort((a, b) => a.name.localeCompare(b.name)),
-        );
-        setStatus('success');
+        dispatch({ type: 'SEARCH_LOADING' });
+        const results = await getData(state.value);
+        dispatch({ type: 'SEARCH_SUCCESS', payload: results });
       } catch (error) {
-        setStatus('error');
-        setError('Error fetching search results. Please try again.');
-        setSelectedItemIndex(null);
-        setSearchResults([]);
+        dispatch({
+          type: 'SEARCH_ERROR',
+          payload: 'Error fetching search results. Please try again.',
+        });
       }
     }, searchDelay);
 
@@ -76,60 +180,35 @@ export function useAutocomplete<
         clearTimeout(timeoutIdRef.current);
       }
     };
-  }, [getData, searchDelay, value]);
+  }, [getData, searchDelay, minSearchLength, state.value]);
 
   useEffect(() => {
-    if (listRef.current && selectedItemIndex !== null) {
-      listRef.current.children[selectedItemIndex].scrollIntoView({
+    if (listRef.current && state.selectedItemIndex !== null) {
+      listRef.current.children[state.selectedItemIndex].scrollIntoView({
         block: 'nearest',
       });
     }
-  }, [selectedItemIndex]);
+  }, [state.selectedItemIndex]);
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    setValue(event.target.value);
+    dispatch({ type: 'INPUT_VALUE_CHANGED', payload: event.target.value });
   }
-
-  const inputKeyDownHandlers: Record<string, VoidFunction> = {
-    [KEY_CODES.ARROW_DOWN]: () => {
-      setSelectedItemIndex((prevIndex) => {
-        if (prevIndex === null || prevIndex === searchResults.length - 1) {
-          return 0;
-        }
-        return prevIndex + 1;
-      });
-    },
-    [KEY_CODES.ARROW_UP]: () => {
-      setSelectedItemIndex((prevIndex) => {
-        if (prevIndex === null || prevIndex === 0) {
-          return searchResults.length - 1;
-        }
-        return prevIndex - 1;
-      });
-    },
-    [KEY_CODES.ENTER]: () => {
-      if (selectedItemIndex !== null) {
-        if (onSelect) {
-          onSelect(searchResults[selectedItemIndex]);
-        } else {
-          setValue(searchResults[selectedItemIndex].name);
-          setSearchResults([]);
-        }
-      }
-    },
-  };
 
   function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     const { code } = event;
-    if (inputKeyDownHandlers[code]) {
+    if (isNavigationCode(code)) {
       event.preventDefault();
-      inputKeyDownHandlers[code]();
+      if (code === 'Enter' && state.selectedItemIndex !== null) {
+        onSelect?.(state.searchResults[state.selectedItemIndex]);
+      } else {
+        dispatch({ type: 'SELECTED_ITEM_CHANGED', payload: code });
+      }
     }
   }
 
   function getInputProps() {
     return {
-      value,
+      value: state.value,
       onChange: handleInputChange,
       onKeyDown: handleInputKeyDown,
     };
@@ -143,7 +222,10 @@ export function useAutocomplete<
     return {
       key: item.id,
       children: item.name,
-      className: clsx(className, selectedItemIndex === index && 'bg-gray-100'),
+      className: clsx(
+        className,
+        state.selectedItemIndex === index && 'bg-gray-100',
+      ),
     };
   }
 
@@ -154,13 +236,10 @@ export function useAutocomplete<
   }
 
   return {
-    value,
-    status,
-    isLoading: status === 'loading',
-    isSuccess: status === 'success',
-    isError: status === 'error',
-    error,
-    searchResults,
+    ...state,
+    isLoading: state.status === 'loading',
+    isSuccess: state.status === 'success',
+    isError: state.status === 'error',
     getInputProps,
     getListItemProps,
     getListProps,
