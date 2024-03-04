@@ -41,7 +41,7 @@ describe('GhAutocomplete', () => {
       items: [
         {
           id: 2,
-          name: 'test-repo',
+          full_name: 'test-repo',
           html_url: 'repopage',
         },
       ] as GithubRepository[],

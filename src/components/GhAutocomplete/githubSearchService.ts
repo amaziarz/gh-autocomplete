@@ -28,7 +28,7 @@ function mapRepositoriesResponseToSearchResults(
   return response.items.map((repository) => ({
     id: repository.id.toString(),
     type: 'repository',
-    name: repository.name,
+    name: repository.full_name,
     url: repository.html_url,
   }));
 }
