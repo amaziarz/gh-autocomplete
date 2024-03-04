@@ -3,14 +3,14 @@ import { clsx } from 'clsx';
 
 type NavigationKeyCode = 'ArrowDown' | 'ArrowUp' | 'Enter';
 
-const ALLOWED_KEY_CODES: NavigationKeyCode[] = [
+const NAVIGATION_KEY_CODES: NavigationKeyCode[] = [
   'ArrowDown',
   'ArrowUp',
   'Enter',
 ];
 
 function isNavigationCode(code: string): code is NavigationKeyCode {
-  return ALLOWED_KEY_CODES.includes(code as NavigationKeyCode);
+  return NAVIGATION_KEY_CODES.includes(code as NavigationKeyCode);
 }
 
 export interface SearchResult {
@@ -20,14 +20,15 @@ export interface SearchResult {
 
 type Status = 'initial' | 'loading' | 'success' | 'error';
 
-type SelectedItemIndex = number | null;
+type ActiveItemIndex = number | null;
 
 interface AutocompleteState<SearchResultType extends SearchResult> {
   value: string;
   status: Status;
   error: string | null;
   searchResults: SearchResultType[];
-  selectedItemIndex: SelectedItemIndex;
+  activeItemIndex: ActiveItemIndex;
+  isSelected: boolean;
 }
 
 type AutocompleteAction<SearchResultType extends SearchResult> =
@@ -47,15 +48,23 @@ type AutocompleteAction<SearchResultType extends SearchResult> =
       payload: string;
     }
   | {
-      type: 'SELECTED_ITEM_CHANGED';
+      type: 'NAVIGATION_KEY_DOWN';
       payload: NavigationKeyCode;
+    }
+  | {
+      type: 'SEARCH_RESULT_HOVERED';
+      payload: number;
+    }
+  | {
+      type: 'SEARCH_RESULT_SELECTED';
+      payload: number;
     };
 
-function calculateSelectedItemIndexState(
+function calculateActiveItemIndexState(
   keyCode: NavigationKeyCode,
-  prevIndex: SelectedItemIndex,
+  prevIndex: ActiveItemIndex,
   searchResultsLength: number,
-): SelectedItemIndex {
+): ActiveItemIndex {
   if (keyCode === 'ArrowDown') {
     return prevIndex === null || prevIndex === searchResultsLength - 1
       ? 0
@@ -78,10 +87,11 @@ function autocompleteReducer<SearchResultType extends SearchResult>(
       return {
         ...state,
         value: action.payload,
+        isSelected: false,
         ...(action.payload.length === 0 && {
           status: 'initial',
           searchResults: [],
-          selectedItemIndex: null,
+          activeItemIndex: null,
         }),
       };
     case 'SEARCH_LOADING':
@@ -89,7 +99,7 @@ function autocompleteReducer<SearchResultType extends SearchResult>(
         ...state,
         status: 'loading',
         error: null,
-        selectedItemIndex: null,
+        activeItemIndex: null,
       };
     case 'SEARCH_SUCCESS':
       return {
@@ -105,18 +115,31 @@ function autocompleteReducer<SearchResultType extends SearchResult>(
         status: 'error',
         error: action.payload,
         searchResults: [],
-        selectedItemIndex: null,
+        activeItemIndex: null,
       };
-    case 'SELECTED_ITEM_CHANGED': {
+    case 'NAVIGATION_KEY_DOWN':
       return {
         ...state,
-        selectedItemIndex: calculateSelectedItemIndexState(
+        activeItemIndex: calculateActiveItemIndexState(
           action.payload,
-          state.selectedItemIndex,
+          state.activeItemIndex,
           state.searchResults.length,
         ),
       };
-    }
+    case 'SEARCH_RESULT_HOVERED':
+      return {
+        ...state,
+        activeItemIndex: action.payload,
+      };
+    case 'SEARCH_RESULT_SELECTED':
+      return {
+        ...state,
+        value: state.searchResults[action.payload].name,
+        isSelected: true,
+        status: 'initial',
+        searchResults: [],
+        activeItemIndex: null,
+      };
     default:
       return state;
   }
@@ -150,7 +173,8 @@ export function useAutocomplete<
     status: 'initial',
     error: null,
     searchResults: [],
-    selectedItemIndex: null,
+    activeItemIndex: null,
+    isSelected: false,
   });
 
   useEffect(() => {
@@ -158,7 +182,7 @@ export function useAutocomplete<
       clearTimeout(timeoutIdRef.current);
     }
 
-    if (state.value.length < minSearchLength) {
+    if (state.value.length < minSearchLength || state.isSelected) {
       return;
     }
 
@@ -180,28 +204,35 @@ export function useAutocomplete<
         clearTimeout(timeoutIdRef.current);
       }
     };
-  }, [getData, searchDelay, minSearchLength, state.value]);
+  }, [getData, searchDelay, minSearchLength, state.value, state.isSelected]);
 
   useEffect(() => {
-    if (listRef.current && state.selectedItemIndex !== null) {
-      listRef.current.children[state.selectedItemIndex].scrollIntoView({
+    if (listRef.current && state.activeItemIndex !== null) {
+      listRef.current.children[state.activeItemIndex].scrollIntoView({
         block: 'nearest',
       });
     }
-  }, [state.selectedItemIndex]);
+  }, [state.activeItemIndex]);
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
     dispatch({ type: 'INPUT_VALUE_CHANGED', payload: event.target.value });
   }
 
+  function handleSelect(index: number) {
+    if (onSelect) {
+      onSelect(state.searchResults[index]);
+    } else {
+      dispatch({ type: 'SEARCH_RESULT_SELECTED', payload: index });
+    }
+  }
+
   function handleInputKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    const { code } = event;
-    if (isNavigationCode(code)) {
+    if (isNavigationCode(event.code)) {
       event.preventDefault();
-      if (code === 'Enter' && state.selectedItemIndex !== null) {
-        onSelect?.(state.searchResults[state.selectedItemIndex]);
+      if (event.code === 'Enter' && state.activeItemIndex !== null) {
+        handleSelect(state.activeItemIndex);
       } else {
-        dispatch({ type: 'SELECTED_ITEM_CHANGED', payload: code });
+        dispatch({ type: 'NAVIGATION_KEY_DOWN', payload: event.code });
       }
     }
   }
@@ -224,8 +255,14 @@ export function useAutocomplete<
       children: item.name,
       className: clsx(
         className,
-        state.selectedItemIndex === index && 'bg-gray-100',
+        state.activeItemIndex === index && 'bg-gray-200',
       ),
+      onMouseEnter: () => {
+        dispatch({ type: 'SEARCH_RESULT_HOVERED', payload: index });
+      },
+      onClick: () => {
+        handleSelect(index);
+      },
     };
   }
 
