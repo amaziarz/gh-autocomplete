@@ -2,9 +2,9 @@ import type {
   GithubRepository,
   GithubSearchResponse,
   GithubUser,
-} from '@/api/types/github.ts';
-import type { SearchResult } from './useAutocomplete.ts';
-import { searchRepositories, searchUsers } from '@/api/github.ts';
+} from '@/api/types/github';
+import type { SearchResult } from './useAutocomplete';
+import { searchRepositories, searchUsers } from '@/api/github';
 
 export interface GithubSearchResult extends SearchResult {
   type: 'user' | 'repository';

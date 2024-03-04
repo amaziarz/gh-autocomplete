@@ -1,9 +1,9 @@
-import { client } from './client.ts';
+import { client } from './client';
 import type {
   GithubRepository,
   GithubSearchResponse,
   GithubUser,
-} from './types/github.ts';
+} from './types/github';
 
 const GITHUB_API_URL = 'https://api.github.com';
 const PER_PAGE = 50;

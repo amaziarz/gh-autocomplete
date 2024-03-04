@@ -1,11 +1,8 @@
 import { useCallback } from 'react';
 import { FaSpinner } from 'react-icons/fa';
 import { clsx } from 'clsx';
-import { useAutocomplete } from './useAutocomplete.ts';
-import {
-  type GithubSearchResult,
-  searchGitHub,
-} from './githubSearchService.ts';
+import { useAutocomplete } from './useAutocomplete';
+import { type GithubSearchResult, searchGitHub } from './githubSearchService';
 
 export function GhAutocomplete() {
   const openGithubPage = useCallback(

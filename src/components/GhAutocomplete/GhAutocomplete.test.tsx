@@ -7,7 +7,7 @@ import {
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as GitHubClient from '@/api/github';
-import type { GithubRepository, GithubUser } from '@/api/types/github.ts';
+import type { GithubRepository, GithubUser } from '@/api/types/github';
 import { GhAutocomplete } from './GhAutocomplete';
 
 const user = userEvent.setup({
