@@ -30,7 +30,11 @@ export function GhAutocomplete() {
 
   return (
     <div className="relative w-full sm:w-2/3 md:w-1/2 lg:w-1/3 xl:w-1/4">
+      <label htmlFor="gh-autocomplete" className="sr-only">
+        GitHub Search
+      </label>
       <input
+        id="gh-autocomplete"
         className={clsx(
           'w-full rounded border border-gray-300 p-2 text-base transition duration-150 ease-in-out focus:border-blue-500 focus:outline-none',
           isError && ['border-red-500', 'focus:border-red-500'],
