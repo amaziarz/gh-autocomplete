@@ -46,13 +46,13 @@ export function GhAutocomplete() {
       )}
       {isSuccess && searchResults.length > 0 && (
         <ul
-          className="absolute max-h-[22rem] w-full overflow-y-auto rounded border border-gray-200"
+          className="absolute max-h-[22rem] w-full overflow-y-auto rounded border border-gray-200 bg-white"
           {...getListProps()}
         >
           {searchResults.map((result, index) => (
             <li
               {...getListItemProps(result, index, {
-                className: 'border-b border-gray-100 bg-white p-2',
+                className: 'border-b border-gray-100 p-2',
               })}
             />
           ))}
