@@ -1,8 +1,11 @@
+import { useCallback } from 'react';
 import { FaSpinner } from 'react-icons/fa';
 import { clsx } from 'clsx';
 import { useAutocomplete } from './useAutocomplete.ts';
-import { GithubSearchResult, searchGitHub } from './githubSearchService.ts';
-import { useCallback } from 'react';
+import {
+  type GithubSearchResult,
+  searchGitHub,
+} from './githubSearchService.ts';
 
 export function GhAutocomplete() {
   const openGithubPage = useCallback(
@@ -52,7 +55,7 @@ export function GhAutocomplete() {
           {searchResults.map((result, index) => (
             <li
               {...getListItemProps(result, index, {
-                className: 'border-b border-gray-100 p-2',
+                className: 'border-b border-gray-100 p-2 truncate',
               })}
             />
           ))}

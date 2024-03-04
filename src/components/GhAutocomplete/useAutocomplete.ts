@@ -215,7 +215,10 @@ export function useAutocomplete<
   }, [state.activeItemIndex]);
 
   function handleInputChange(event: React.ChangeEvent<HTMLInputElement>) {
-    dispatch({ type: 'INPUT_VALUE_CHANGED', payload: event.target.value });
+    dispatch({
+      type: 'INPUT_VALUE_CHANGED',
+      payload: event.target.value.trim(),
+    });
   }
 
   function handleSelect(index: number) {
