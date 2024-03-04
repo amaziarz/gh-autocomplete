@@ -20,7 +20,7 @@ export function searchUsers(
   query: string,
 ): Promise<GithubSearchResponse<GithubUser>> {
   return client<GithubSearchResponse<GithubUser>>(
-    `${GITHUB_API_URL}/search/users?q=${query}&per_page=${PER_PAGE}`,
+    `${GITHUB_API_URL}/search/users?q=${query}+${encodeURIComponent('in:login')}&per_page=${PER_PAGE}`,
     REQUEST_CONFIG,
   );
 }
@@ -29,7 +29,7 @@ export function searchRepositories(
   query: string,
 ): Promise<GithubSearchResponse<GithubRepository>> {
   return client(
-    `${GITHUB_API_URL}/search/repositories?q=${query}&per_page=${PER_PAGE}`,
+    `${GITHUB_API_URL}/search/repositories?q=${query}+${encodeURIComponent('in:name')}&per_page=${PER_PAGE}`,
     REQUEST_CONFIG,
   );
 }
